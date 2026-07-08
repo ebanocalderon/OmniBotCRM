@@ -37,7 +37,7 @@ fi
 # ── 3. Clone / update repo ────────────────────────────────────────────────────
 if [[ -d "$INSTALL_DIR/.git" ]]; then
     info "Updating existing installation …"
-    git -C "$INSTALL_DIR" pull --ff-only
+    sudo -u "$SERVICE_USER" git -C "$INSTALL_DIR" pull --ff-only
     # Clear Python bytecode cache to pick up any changed files
     find "$INSTALL_DIR" -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 else
