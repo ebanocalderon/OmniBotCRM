@@ -245,6 +245,18 @@ chatwoot-telegram-bridge/
 - Check that the reply is not a private note
 - `sudo journalctl -u chatwoot-bridge -f` and watch for warnings
 
+**Chatwoot blocks local IP (SSRF Block/Failed to send message)**
+If you are running the bridge and Chatwoot on the same local network, Chatwoot will block outgoing webhooks to private IPs (e.g. `10.0.0.41`, `localhost`) by default, showing `Invalid webhook URL` or `Failed to send` in the UI. 
+
+To fix this:
+1. Open Chatwoot's `.env` file (e.g., `/root/.env` or `/home/chatwoot/chatwoot/.env`).
+2. Add or set these configuration values:
+   ```env
+   ENABLE_SSRF_PREVENTION=false
+   SAFE_FETCH_ALLOW_PRIVATE_NETWORK=true
+   ```
+3. Restart your Chatwoot service or Docker Compose stack (`docker compose down && docker compose up -d`).
+
 **Service won't start**
 - `sudo journalctl -u chatwoot-bridge -n 50 --no-pager`
 - Verify `/opt/chatwoot-bridge/.env` has all required values
