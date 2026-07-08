@@ -1,0 +1,114 @@
+# =================================================================
+#  OmniBot Platform — Docker Compose (Development)
+#
+#  Spins up the full development stack:
+#  PostgreSQL, Redis, Keycloak, Platform API
+#
+#  Usage:
+#    docker compose up -d          # Start all services
+#    docker compose logs -f api    # Watch API logs
+#    docker compose down           # Stop everything
+# =================================================================
+
+services:
+  # ── PostgreSQL ───────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: omnibot-postgres
+    environment:
+      POSTGRES_USER: omnibot
+      POSTGRES_PASSWORD: omnibot
+      POSTGRES_DB: omnibot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omnibot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: omnibot-redis
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Keycloak (Auth) ─────────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: omnibot-keycloak
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/omnibot
+      KC_DB_USERNAME: omnibot
+      KC_DB_PASSWORD: omnibot
+      KC_DB_SCHEMA: keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Platform API ────────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: omnibot-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://omnibot:omnibot@postgres:5432/omnibot
+      REDIS_URL: redis://redis:6379/0
+      KEYCLOAK_SERVER_URL: http://keycloak:8080
+      KEYCLOAK_REALM: omnibot
+      KEYCLOAK_CLIENT_ID: omnibot-api
+      ENVIRONMENT: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      LOG_FORMAT: console
+      # Chatwoot — configure with your instance
+      CHATWOOT_BASE_URL: ${CHATWOOT_BASE_URL:-http://localhost:3000}
+      CHATWOOT_API_TOKEN: ${CHATWOOT_API_TOKEN:-}
+      CHATWOOT_ACCOUNT_ID: ${CHATWOOT_ACCOUNT_ID:-1}
+      # Telegram
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      # AI Defaults
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-in-production}
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Platform UI (Next.js) ───────────────────────────────────────
+  ui:
+    build:
+      context: ./platform-ui
+      dockerfile: Dockerfile
+    container_name: omnibot-ui
+    environment:
+      NEXT_PUBLIC_API_URL: http://10.0.0.41:8001/api/v1
+    ports:
+      - "3001:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:

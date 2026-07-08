@@ -1,3 +1,0 @@
-"""
-Chatwoot ↔ Telegram Bridge
-"""
