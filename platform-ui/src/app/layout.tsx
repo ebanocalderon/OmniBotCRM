@@ -19,11 +19,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} antialiased h-screen flex overflow-hidden`}>
+      <body className={`${inter.variable} font-sans antialiased h-screen flex overflow-hidden bg-slate-950 text-slate-50 relative selection:bg-emerald-500/30`}>
+        {/* Animated Glassmorphism Background Spheres */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-emerald-600/30 blur-[120px] animate-blob mix-blend-screen" />
+          <div className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-600/20 blur-[120px] animate-blob animation-delay-2000 mix-blend-screen" />
+          <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[50%] rounded-full bg-blue-600/20 blur-[120px] animate-blob animation-delay-4000 mix-blend-screen" />
+        </div>
+
         <I18nProvider>
           <AuthProvider>
             <Sidebar />
-            <main className="flex-1 overflow-y-auto bg-slate-50 text-slate-900">
+            <main className="flex-1 overflow-y-auto relative z-0">
               {children}
             </main>
           </AuthProvider>
