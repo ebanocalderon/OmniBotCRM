@@ -279,6 +279,72 @@ async def create_opportunity(
     service = CRMService(db, tenant_ctx.tenant_id)
     return await service.create_opportunity(data)
 
+@router.get("/pipelines/{pipeline_id}/board")
+async def get_pipeline_board(
+    pipeline_id: uuid.UUID,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> dict:
+    from app.crm.models import Pipeline
+    from sqlalchemy.orm import selectinload
+    
+    query = select(Pipeline).options(selectinload(Pipeline.opportunities)).where(
+        Pipeline.tenant_id == tenant_ctx.tenant_id,
+        Pipeline.id == pipeline_id
+    )
+    result = await db.execute(query)
+    pipeline = result.scalar_one_or_none()
+    
+    if not pipeline:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+        
+    return {
+        "pipeline": {
+            "id": pipeline.id,
+            "name": pipeline.name,
+            "stages": pipeline.stages
+        },
+        "opportunities": pipeline.opportunities
+    }
+
+class OpportunityMove(BaseModel):
+    stage: str
+    probability: Optional[int] = None
+
+@router.patch("/opportunities/{opportunity_id}/move", response_model=OpportunityResponse)
+async def move_opportunity(
+    opportunity_id: uuid.UUID,
+    data: OpportunityMove,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> OpportunityResponse:
+    service = CRMService(db, tenant_ctx.tenant_id)
+    
+    query = select(Opportunity).where(
+        Opportunity.tenant_id == tenant_ctx.tenant_id,
+        Opportunity.id == opportunity_id
+    )
+    result = await db.execute(query)
+    opp = result.scalar_one_or_none()
+    
+    if not opp:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+        
+    opp.stage = data.stage
+    if data.probability is not None:
+        opp.probability = data.probability
+        
+    if opp.stage == "Closed Won":
+        opp.won_at = datetime.utcnow()
+    elif opp.stage == "Closed Lost":
+        opp.lost_at = datetime.utcnow()
+        
+    await db.commit()
+    await db.refresh(opp)
+    
+    return opp
 
 # ── Activities ────────────────────────────────────────────────────────────────
 

@@ -162,6 +162,9 @@ class OpportunityBase(BaseModel):
     probability: Optional[int] = None
     assigned_to: Optional[uuid.UUID] = None
     custom_fields: Optional[dict] = None
+    won_at: Optional[datetime] = None
+    lost_at: Optional[datetime] = None
+    lost_reason: Optional[str] = None
 
 
 class OpportunityCreate(OpportunityBase):
@@ -176,6 +179,9 @@ class OpportunityUpdate(BaseModel):
     probability: Optional[int] = None
     assigned_to: Optional[uuid.UUID] = None
     custom_fields: Optional[dict] = None
+    won_at: Optional[datetime] = None
+    lost_at: Optional[datetime] = None
+    lost_reason: Optional[str] = None
 
 
 class OpportunityResponse(OpportunityBase):

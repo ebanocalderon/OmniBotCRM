@@ -16,6 +16,7 @@ from app.crm.models import Company, Contact, Lead, Opportunity, Pipeline, Activi
 from app.messaging.models import Inbox, Conversation, Message, CallRecord, EmailMessage
 from app.ai.models import AIConfig, ConversationMemory
 from app.automations.models import AutomationRule
+from app.payments.models import Invoice, Payment, PaymentLink
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

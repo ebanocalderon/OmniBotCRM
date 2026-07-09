@@ -229,6 +229,9 @@ class Opportunity(Base):
     probability: Mapped[Optional[int]] = mapped_column(Integer)
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
     custom_fields: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
+    won_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    lost_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    lost_reason: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Relationships
     pipeline: Mapped["Pipeline"] = relationship(back_populates="opportunities")
