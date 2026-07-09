@@ -15,6 +15,7 @@ from app.tenants.models import Tenant, User
 from app.crm.models import Contact, Lead, Opportunity, Pipeline, Activity
 from app.messaging.models import Inbox, Conversation, Message
 from app.ai.models import AIConfig, ConversationMemory
+from app.automations.models import AutomationRule
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

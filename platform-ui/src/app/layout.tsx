@@ -23,7 +23,7 @@ export default function RootLayout({
         <I18nProvider>
           <AuthProvider>
             <Sidebar />
-            <main className="flex-1 overflow-y-auto bg-background/50 backdrop-blur-3xl">
+            <main className="flex-1 overflow-y-auto bg-slate-50 text-slate-900">
               {children}
             </main>
           </AuthProvider>

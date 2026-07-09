@@ -11,7 +11,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
@@ -107,15 +107,24 @@ def _register_routers(app: FastAPI) -> None:
 
     from app.tenants.router import router as tenants_router
     from app.crm.router import router as crm_router
+    from app.messaging.router import router as messaging_router
+    from app.auth.router import router as auth_router
+    from app.automations.router import router as automations_router
+    from app.analytics.router import router as analytics_router
     
     # Ensure all models are loaded into the SQLAlchemy registry
     from app.messaging import models as messaging_models  # noqa: F401
     from app.ai import models as ai_models  # noqa: F401
     
-    app.include_router(tenants_router, prefix="/api/v1")
-    app.include_router(crm_router, prefix="/api/v1")
-    # app.include_router(messaging_router, prefix="/api/v1")
-    # app.include_router(ai_router, prefix="/api/v1")
+    api_router = APIRouter(prefix="/api/v1")
+    api_router.include_router(tenants_router)
+    api_router.include_router(crm_router)
+    api_router.include_router(messaging_router)
+    api_router.include_router(auth_router)
+    api_router.include_router(automations_router)
+    api_router.include_router(analytics_router)
+    
+    app.include_router(api_router)
 
 
 # ── Module-level app instance (for uvicorn) ──────────────────────────────────

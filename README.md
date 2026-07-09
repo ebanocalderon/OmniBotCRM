@@ -1,262 +1,157 @@
-# Chatwoot ↔ Telegram Bridge
+# OmniBot — AI Customer Operations Platform
 
-A production-ready Python bridge that **bi-directionally** connects a self-hosted [Chatwoot](https://www.chatwoot.com/) instance to a Telegram bot.
+An open-source, enterprise-ready platform that combines **AI**, **CRM**, **omnichannel communications**, **workflow automation**, and **cloud contact center** capabilities into a unified system.
+
+Build to automate and optimize the entire customer operations lifecycle — from first contact to resolution — across every channel, with AI handling repetitive work and assisting human agents.
+
+---
+
+## Architecture
 
 ```
-Telegram User  ──►  Bridge Server (10.0.0.41:8000)  ──►  Chatwoot (agent sees message)
-Chatwoot Agent ──►  Bridge Server (10.0.0.41:8000)  ──►  Telegram User (gets reply)
+                    ┌─────────────────────┐
+                    │   Platform UI        │
+                    │   (Next.js :3001)    │
+                    └──────┬──────────────┘
+                           │ HTTP
+                    ┌──────▼──────────────┐
+                    │   Platform API       │
+                    │  (FastAPI :8000)     │
+                    └──┬────┬────┬────┬───┘
+                       │    │    │    │
+            ┌──────────┘    │    │    └──────────┐
+            ▼                ▼    ▼                ▼
+     ┌──────────┐    ┌──────────┐    ┌──────────────────┐
+     │PostgreSQL│    │   Redis  │    │    Keycloak      │
+     │(pgvector)│    │  (Cache) │    │    (Auth / SSO)  │
+     └──────────┘    └──────────┘    └──────────────────┘
 ```
 
----
+**AI Layer** — Ollama (local), OpenAI, Anthropic — with configurable provider routing and loop-safe auto-responders.
 
-## Features
+**Messaging Layer** — Native Telegram channel integration, webhook ingestion, and extensible channel drivers for omnichannel routing.
 
-- ✅ Messages from Telegram → Chatwoot conversations (auto-creates contact + conversation)
-- ✅ Agent replies from Chatwoot → Telegram user
-- ✅ Persistent session mapping via SQLite (no duplicates across restarts)
-- ✅ Optional HMAC-SHA256 webhook signature verification
-- ✅ Handles text, photos, documents, voice, and stickers
-- ✅ `/start`, `/help`, `/status` Telegram commands
-- ✅ FastAPI interactive docs at `/docs`
-- ✅ Health check endpoint at `/health`
-- ✅ Runs as a systemd service on Ubuntu (auto-restart on crash / reboot)
+**CRM Layer** — Contact management, conversation history, account/tenant isolation, and full CRUD over API.
+
+**Automation Layer** — Rule-based triggers and actions, workflow engine, scheduled jobs.
 
 ---
 
-## Prerequisites
+## Services
 
-| Requirement | Notes |
-|---|---|
-| Python 3.11+ | |
-| A running Chatwoot instance | Self-hosted or cloud |
-| A Telegram Bot Token | From [@BotFather](https://t.me/BotFather) |
-| Ubuntu server (10.0.0.41) | For production deployment |
+| Service | Stack | Port |
+|---|---|---|
+| **Platform API** | Python FastAPI + SQLAlchemy async + pgvector | `8000` |
+| **Platform UI** | Next.js 14 (App Router) + TypeScript + Tailwind | `3001` |
+| **PostgreSQL** | pgvector/pg16 (vector embeddings) | `5432` |
+| **Redis** | Redis 7 Alpine (caching, queues) | `6379` |
+| **Keycloak** | Auth / SSO / RBAC | `8080` |
 
 ---
 
-## Quick Start — Ubuntu Server (10.0.0.41)
-
-### 1. SSH into the server
+## Quick Start
 
 ```bash
-ssh user@10.0.0.41
-```
-
-### 2. Clone the repository
-
-```bash
+# Clone
 git clone https://github.com/ebanocalderon/OmniBot.git
-cd chatwoot-telegram-bridge
+cd chatwoot
+
+# Copy environment config
+cp .env.example .env
+
+# Start the full stack
+docker compose up -d
+
+# Apply database migrations
+docker compose exec api alembic upgrade head
 ```
 
-### 3. Run the automated deployment script
-
-```bash
-sudo bash deploy/deploy.sh
-```
-
-This will:
-- Install system dependencies (git, python3, python3-venv)
-- Create a dedicated `bridge` system user
-- Clone/update the repo to `/opt/chatwoot-bridge`
-- Create a Python virtual environment and install all packages
-- Copy `.env.example` → `/opt/chatwoot-bridge/.env` (if not already present)
-- Install and enable the `chatwoot-bridge` systemd service
-- Start the service immediately
-
-### 4. Edit the configuration
-
-```bash
-sudo nano /opt/chatwoot-bridge/.env
-```
-
-Fill in all the required values:
-
-```env
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
-CHATWOOT_BASE_URL=http://localhost:3000
-CHATWOOT_API_TOKEN=your_api_token
-CHATWOOT_ACCOUNT_ID=1
-CHATWOOT_INBOX_ID=1
-SERVER_HOST=0.0.0.0
-SERVER_PORT=8000
-```
-
-### 5. Restart and verify
-
-```bash
-sudo systemctl restart chatwoot-bridge
-curl http://10.0.0.41:8000/health
-# Expected: {"status":"ok","telegram_polling":true}
-```
-
-### 6. Register the Chatwoot webhook
-
-In Chatwoot: **Settings → Integrations → Webhooks → Add new webhook**
-
-- URL: `http://10.0.0.41:8000/chatwoot/webhook`
-- Enable: ✅ **Message Created**
-
----
-
-## Manual Local Development Setup
-
-### 1. Clone & create virtual environment
-
-```bash
-git clone https://github.com/ebanocalderon/OmniBot.git
-cd chatwoot-telegram-bridge
-
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# macOS / Linux
-source venv/bin/activate
-```
-
-### 2. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Configure environment variables
-
-```bash
-cp .env.example .env  # Linux/macOS
-# copy .env.example .env  # Windows
-```
-
-Edit `.env` and fill in all values.
-
-### 4. Run the server
-
-```bash
-python run.py
-```
-
----
-
-## Useful Service Commands
-
-```bash
-# Check status
-sudo systemctl status chatwoot-bridge
-
-# View live logs
-sudo journalctl -u chatwoot-bridge -f
-
-# View recent logs (last 100 lines)
-sudo journalctl -u chatwoot-bridge -n 100 --no-pager
-
-# Restart
-sudo systemctl restart chatwoot-bridge
-
-# Stop
-sudo systemctl stop chatwoot-bridge
-
-# Disable auto-start on boot
-sudo systemctl disable chatwoot-bridge
-```
-
----
-
-## Updating the Service
-
-After pushing a new version to GitHub, on the server run:
-
-```bash
-sudo bash /opt/chatwoot-bridge/deploy/deploy.sh
-```
-
-Or manually:
-
-```bash
-cd /opt/chatwoot-bridge
-sudo git pull
-sudo -u bridge venv/bin/pip install -r requirements.txt -q
-sudo systemctl restart chatwoot-bridge
-```
+**Access the platform:**
+- Platform UI: [http://localhost:3001](http://localhost:3001)
+- API Docs: [http://localhost:8000/api/v1/docs](http://localhost:8000/api/v1/docs)
+- Keycloak Admin: [http://localhost:8080](http://localhost:8080)
 
 ---
 
 ## Project Structure
 
 ```
-chatwoot-telegram-bridge/
-├── .env.example           # Config template (commit this, NOT .env)
-├── .gitignore
-├── requirements.txt
-├── README.md
-├── run.py                 # Entry point
+chatwoot/
+├── docker-compose.yml          # Full dev stack orchestration
+├── .env.example                # Environment variables template
 │
-├── deploy/
-│   ├── chatwoot-bridge.service   # systemd unit file
-│   └── deploy.sh                 # Ubuntu deployment script
+├── backend/                    # Platform API (FastAPI)
+│   ├── app/
+│   │   ├── ai/                 # AI provider routing, auto-responders
+│   │   ├── analytics/          # Usage metrics, reporting
+│   │   ├── auth/               # Keycloak OAuth, session management
+│   │   ├── automations/        # Rule engine, triggers, actions
+│   │   ├── core/               # Database, config, security, models
+│   │   ├── crm/                # Contacts, conversations, accounts
+│   │   ├── messaging/          # Telegram channels, webhooks, drivers
+│   │   └── tenants/            # Multi-tenant isolation
+│   ├── migrations/             # Alembic DB migrations
+│   └── pyproject.toml
 │
-└── app/
-    ├── config.py          # pydantic-settings loader
-    ├── database.py        # SQLite session store
-    ├── main.py            # FastAPI app + lifespan
-    │
-    ├── chatwoot/
-    │   ├── client.py      # Async Chatwoot REST API wrapper
-    │   └── webhook.py     # POST /chatwoot/webhook handler
-    │
-    └── telegram/
-        └── bot.py         # Bot handlers + polling runner
+├── platform-ui/                # Platform UI (Next.js 14)
+│   └── src/
+│       └── app/
+│           ├── dashboard/      # Analytics & KPIs
+│           ├── conversations/  # Omnichannel inbox
+│           ├── contacts/       # Contact management
+│           ├── automations/    # Workflow builder
+│           ├── settings/       # Channel & org configuration
+│           └── login/          # Auth flows
+│
+├── AGENTS.md                   # Development conventions
+└── README.md
 ```
 
 ---
 
-## Environment Variables Reference
+## Environment Variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | ✅ | — | Bot token from @BotFather |
-| `CHATWOOT_BASE_URL` | ✅ | — | Your Chatwoot URL |
-| `CHATWOOT_API_TOKEN` | ✅ | — | Profile → Access Token |
-| `CHATWOOT_ACCOUNT_ID` | ✅ | — | Numeric account ID |
-| `CHATWOOT_INBOX_ID` | ✅ | — | API inbox numeric ID |
-| `SERVER_HOST` | ❌ | `0.0.0.0` | Bind address |
-| `SERVER_PORT` | ❌ | `8000` | Bind port |
-| `WEBHOOK_SECRET` | ❌ | `` | HMAC secret for Chatwoot webhook |
-| `DATABASE_PATH` | ❌ | `bridge.db` | SQLite file path |
-| `LOG_LEVEL` | ❌ | `INFO` | DEBUG/INFO/WARNING/ERROR |
+| `DATABASE_URL` | ✅ | — | PostgreSQL connection (asyncpg) |
+| `REDIS_URL` | ✅ | — | Redis connection |
+| `KEYCLOAK_SERVER_URL` | ✅ | — | Keycloak base URL |
+| `KEYCLOAK_REALM` | ✅ | `omnibot` | Keycloak realm |
+| `KEYCLOAK_CLIENT_ID` | ✅ | `omnibot-api` | Keycloak client |
+| `SECRET_KEY` | ✅ | — | Session & JWT signing |
+| `CHATWOOT_BASE_URL` | ❌ | — | Chatwoot instance URL |
+| `CHATWOOT_API_TOKEN` | ❌ | — | Chatwoot access token |
+| `TELEGRAM_BOT_TOKEN` | ❌ | — | Telegram bot token |
+| `OLLAMA_BASE_URL` | ❌ | `http://localhost:11434` | Local AI endpoint |
+| `OPENAI_API_KEY` | ❌ | — | OpenAI API key |
+| `ANTHROPIC_API_KEY` | ❌ | — | Anthropic API key |
 
 ---
 
-## Troubleshooting
+## Development
 
-**Bot doesn't respond in Telegram**
-- Check that `TELEGRAM_BOT_TOKEN` is correct
-- `sudo journalctl -u chatwoot-bridge -n 50 --no-pager`
-- Make sure no other process is polling the same bot
+```bash
+# Backend (standalone)
+cd backend
+python -m venv venv; venv\Scripts\activate  # Windows
+# source venv/bin/activate                  # macOS/Linux
+pip install -e .
+uvicorn app.main:app --reload --port 8000
 
-**Chatwoot doesn't receive messages**
-- Confirm `CHATWOOT_API_TOKEN`, `CHATWOOT_ACCOUNT_ID`, `CHATWOOT_INBOX_ID` are correct
-- The inbox must be of type **API**
-- Check `curl http://10.0.0.41:8000/health`
+# Frontend (standalone)
+cd platform-ui
+npm install
+npm run dev
+```
 
-**Agent replies don't reach Telegram**
-- Confirm the webhook URL `http://10.0.0.41:8000/chatwoot/webhook` is registered in Chatwoot
-- Check that the reply is not a private note
-- `sudo journalctl -u chatwoot-bridge -f` and watch for warnings
+---
 
-**Chatwoot blocks local IP (SSRF Block/Failed to send message)**
-If you are running the bridge and Chatwoot on the same local network, Chatwoot will block outgoing webhooks to private IPs (e.g. `10.0.0.41`, `localhost`) by default, showing `Invalid webhook URL` or `Failed to send` in the UI. 
+## Deployment
 
-To fix this:
-1. Open Chatwoot's `.env` file (e.g., `/root/.env` or `/home/chatwoot/chatwoot/.env`).
-2. Add or set these configuration values:
-   ```env
-   ENABLE_SSRF_PREVENTION=false
-   SAFE_FETCH_ALLOW_PRIVATE_NETWORK=true
-   ```
-3. Restart your Chatwoot service or Docker Compose stack (`docker compose down && docker compose up -d`).
+The platform runs as a Docker Compose stack on any Linux server with Docker installed.
 
-**Service won't start**
-- `sudo journalctl -u chatwoot-bridge -n 50 --no-pager`
-- Verify `/opt/chatwoot-bridge/.env` has all required values
+```bash
+docker compose up -d --build
+```
+
+For production, configure reverse proxy (nginx/Caddy) with TLS in front of the UI and API services.

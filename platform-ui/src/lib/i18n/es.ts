@@ -2,7 +2,7 @@ import { Dictionary } from "./en";
 
 export const es: Dictionary = {
   app: {
-    title: "TalosFlow Administrador",
+    title: "OmniBot Administrador",
     viewing: "Viendo:",
     logout: "Salir de vista",
   },

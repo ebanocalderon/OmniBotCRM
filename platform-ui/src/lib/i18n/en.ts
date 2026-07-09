@@ -1,6 +1,6 @@
 export const en = {
   app: {
-    title: "TalosFlow Administrator",
+    title: "OmniBot Administrator",
     viewing: "Viewing:",
     logout: "Exit view",
   },

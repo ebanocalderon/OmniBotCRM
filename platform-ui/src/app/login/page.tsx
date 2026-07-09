@@ -6,18 +6,41 @@ import { useI18n } from "@/lib/i18n/i18n-context";
 import { Bot, LogIn } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [email, setEmail] = useState("admin@omnibot.io");
+  const [password, setPassword] = useState("admin");
+  const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
   const { t, lang, setLang } = useI18n();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password) {
-      login();
-    } else {
-      setError(true);
+    if (!email || !password) {
+      setError("Please enter both email and password.");
+      return;
+    }
+    
+    try {
+      const response = await fetch("/api/proxy/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          username: email,
+          password: password,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Invalid credentials");
+      }
+
+      const data = await response.json();
+      if (data.access_token) {
+        login(data.access_token);
+      }
+    } catch (err) {
+      setError(t.login.error || "Login failed. Please check your credentials.");
     }
   };
 
@@ -70,7 +93,7 @@ export default function LoginPage() {
 
           {error && (
             <div className="text-red-500 text-sm font-medium text-center bg-red-50 p-2 rounded-lg">
-              {t.login.error}
+              {error}
             </div>
           )}
 

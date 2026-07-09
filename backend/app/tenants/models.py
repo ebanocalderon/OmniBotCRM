@@ -83,6 +83,9 @@ class User(Base):
     keycloak_user_id: Mapped[Optional[str]] = mapped_column(
         String(255), unique=True, index=True
     )
+    
+    # Native Auth
+    hashed_password: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Chatwoot agent mapping
     chatwoot_agent_id: Mapped[Optional[int]] = mapped_column(Integer)

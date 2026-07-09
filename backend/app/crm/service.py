@@ -20,6 +20,7 @@ from app.crm.schemas import (
     OpportunityCreate,
     OpportunityUpdate,
 )
+from app.automations.service import AutomationEngine
 
 
 class CRMService:
@@ -63,6 +64,18 @@ class CRMService:
                 payload={"contact_id": str(contact.id)},
             )
         )
+        
+        # Trigger automations
+        auto_engine = AutomationEngine(self.db)
+        await auto_engine.trigger_event(
+            tenant_id=self.tenant_id,
+            event_type="contact_created",
+            context={
+                "contact_id": str(contact.id),
+                "source": contact.source
+            }
+        )
+        
         return contact
 
     async def update_contact(

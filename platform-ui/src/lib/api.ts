@@ -7,6 +7,13 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     "Content-Type": "application/json",
   };
 
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("token");
+    if (token) {
+      defaultHeaders["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
   const config = {
     ...options,
     headers: {

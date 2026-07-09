@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #12826a; /* Talosflow green */
+  --color-primary: #12826a; /* OmniBot green */
   --color-sidebar: #f8fafc;
   --color-border: #e2e8f0;
   --color-background: #ffffff;
