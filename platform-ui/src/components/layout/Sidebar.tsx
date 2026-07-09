@@ -41,7 +41,6 @@ export function Sidebar() {
     { name: "Payments", path: "/payments", icon: CreditCard },
     { name: "Marketing", path: "/marketing", icon: Send },
     { name: "Automation", path: "/automation", icon: Bot },
-    { name: "Sites", path: "/sites", icon: Globe },
     { name: "Memberships", path: "/memberships", icon: Award },
     { name: "Media Storage", path: "/media", icon: ImageIcon },
     { name: "Reputation", path: "/reputation", icon: Star },

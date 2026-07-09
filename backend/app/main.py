@@ -110,6 +110,8 @@ def _register_routers(app: FastAPI) -> None:
     from app.messaging.router import router as messaging_router
     from app.ai.router import router as ai_router
     from app.payments.router import router as payments_router
+    from app.scheduling.router import router as scheduling_router
+    from app.scheduling.router import public_router as public_scheduling_router
     from app.auth.router import router as auth_router
     from app.automations.router import router as automations_router
     from app.analytics.router import router as analytics_router
@@ -124,6 +126,8 @@ def _register_routers(app: FastAPI) -> None:
     api_router.include_router(messaging_router)
     api_router.include_router(ai_router)
     api_router.include_router(payments_router)
+    api_router.include_router(scheduling_router)
+    api_router.include_router(public_scheduling_router)
     api_router.include_router(auth_router)
     api_router.include_router(automations_router)
     api_router.include_router(analytics_router)

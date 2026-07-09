@@ -17,6 +17,8 @@ from app.messaging.models import Inbox, Conversation, Message, CallRecord, Email
 from app.ai.models import AIConfig, ConversationMemory
 from app.automations.models import AutomationRule
 from app.payments.models import Invoice, Payment, PaymentLink
+from app.automations.models import Workflow, WorkflowStep, WorkflowExecution, WorkflowExecutionLog
+from app.scheduling.models import Calendar, Availability, Appointment
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
