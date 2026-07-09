@@ -105,3 +105,31 @@ class ConversationMemory(Base):
 
     def __repr__(self) -> str:
         return f"<ConversationMemory id={self.id} role={self.role}>"
+
+
+class AIAgent(Base):
+    __tablename__ = "ai_agents"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    agent_type: Mapped[str] = mapped_column(String(50), nullable=False) # conversation, content, workflow, review
+    
+    provider: Mapped[str] = mapped_column(String(50), default="openai")
+    prompt_config: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
+    
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    created_at: Mapped[Optional[str]] = mapped_column(String, default="now")
+
+class ContentGeneration(Base):
+    __tablename__ = "content_generations"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ai_agents.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    content_type: Mapped[str] = mapped_column(String(50), nullable=False) # email, blog, social
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    output: Mapped[Optional[str]] = mapped_column(Text)
+    
+    created_at: Mapped[Optional[str]] = mapped_column(String, default="now")

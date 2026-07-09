@@ -12,9 +12,9 @@ from app.core.database import Base
 
 # Import all models so Alembic can detect them for autogenerate
 from app.tenants.models import Tenant, User
-from app.crm.models import Company, Contact, Lead, Opportunity, Pipeline, Activity
-from app.messaging.models import Inbox, Conversation, Message, CallRecord, EmailMessage
-from app.ai.models import AIConfig, ConversationMemory
+from app.crm.models import Contact, Lead, Opportunity, Pipeline, Activity, Company
+from app.messaging.models import Inbox, Message, Conversation, CallRecord, EmailMessage
+from app.ai.models import AIConfig, ConversationMemory, AIAgent, ContentGeneration
 from app.automations.models import AutomationRule
 from app.payments.models import Invoice, Payment, PaymentLink
 from app.automations.models import Workflow, WorkflowStep, WorkflowExecution, WorkflowExecutionLog
