@@ -1,86 +1,67 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import uuid
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from uuid import UUID
-from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user
-from app.tenants.models import User
-from app.automations.models import AutomationRule
-from app.automations.schemas import AutomationRuleCreate, AutomationRuleUpdate, AutomationRuleResponse
+from app.tenants.dependencies import get_current_tenant_id
+from app.automations.models import Workflow, WorkflowStep, WorkflowExecution
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/automations", tags=["automations"])
 
-@router.get("", response_model=List[AutomationRuleResponse])
-async def list_automations(
-    current_user: User = Depends(get_current_user),
+class WorkflowResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    is_active: bool
+    trigger_type: str
+    
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+@router.get("/workflows", response_model=List[WorkflowResponse])
+async def list_workflows(
+    tenant_id: uuid.UUID = Depends(get_current_tenant_id),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(AutomationRule).where(AutomationRule.tenant_id == current_user.tenant_id).order_by(AutomationRule.created_at.desc())
-    result = await db.execute(stmt)
+    result = await db.execute(select(Workflow).where(Workflow.tenant_id == tenant_id))
     return result.scalars().all()
 
-@router.post("", response_model=AutomationRuleResponse, status_code=status.HTTP_201_CREATED)
-async def create_automation(
-    rule_in: AutomationRuleCreate,
-    current_user: User = Depends(get_current_user),
+@router.post("/workflows/{workflow_id}/trigger")
+async def trigger_workflow(
+    workflow_id: uuid.UUID,
+    contact_id: uuid.UUID,
+    tenant_id: uuid.UUID = Depends(get_current_tenant_id),
     db: AsyncSession = Depends(get_db)
 ):
-    rule = AutomationRule(
-        tenant_id=current_user.tenant_id,
-        name=rule_in.name,
-        trigger_event=rule_in.trigger_event,
-        trigger_condition=rule_in.trigger_condition,
-        action_type=rule_in.action_type,
-        action_config=rule_in.action_config,
-        is_active=rule_in.is_active
-    )
-    db.add(rule)
-    await db.commit()
-    await db.refresh(rule)
-    return rule
-
-@router.put("/{rule_id}", response_model=AutomationRuleResponse)
-async def update_automation(
-    rule_id: UUID,
-    rule_in: AutomationRuleUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    stmt = select(AutomationRule).where(
-        AutomationRule.id == rule_id, 
-        AutomationRule.tenant_id == current_user.tenant_id
-    )
-    result = await db.execute(stmt)
-    rule = result.scalar_one_or_none()
+    # Fetch workflow and first step
+    wf_result = await db.execute(select(Workflow).where(Workflow.id == workflow_id, Workflow.tenant_id == tenant_id))
+    workflow = wf_result.scalar_one_or_none()
     
-    if not rule:
-        raise HTTPException(status_code=404, detail="Automation rule not found")
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
         
-    update_data = rule_in.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(rule, key, value)
-        
-    await db.commit()
-    await db.refresh(rule)
-    return rule
-
-@router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_automation(
-    rule_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    stmt = select(AutomationRule).where(
-        AutomationRule.id == rule_id, 
-        AutomationRule.tenant_id == current_user.tenant_id
-    )
-    result = await db.execute(stmt)
-    rule = result.scalar_one_or_none()
+    step_result = await db.execute(select(WorkflowStep).where(WorkflowStep.workflow_id == workflow_id).limit(1))
+    first_step = step_result.scalar_one_or_none()
     
-    if not rule:
-        raise HTTPException(status_code=404, detail="Automation rule not found")
+    if not first_step:
+        raise HTTPException(status_code=400, detail="Workflow has no steps")
         
-    await db.delete(rule)
+    # Create execution
+    execution = WorkflowExecution(
+        workflow_id=workflow_id,
+        contact_id=contact_id,
+        current_step_id=first_step.id,
+        status="running"
+    )
+    db.add(execution)
     await db.commit()
+    await db.refresh(execution)
+    
+    # Enqueue execution
+    from app.automations.scheduler import enqueue_workflow_execution
+    await enqueue_workflow_execution(str(execution.id))
+    
+    return {"message": "Workflow triggered", "execution_id": execution.id}

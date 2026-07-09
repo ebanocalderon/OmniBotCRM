@@ -41,6 +41,8 @@ dependencies = [
     "twilio>=9.1.1",
     "aiosmtplib>=3.0.1",
     "aioimaplib>=1.0.1",
+    "arq>=0.25.0",
+    "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]
