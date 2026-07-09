@@ -1,3 +1,5 @@
+"use client";
+
 import { Phone, Megaphone, Bell, User, ChevronDown, HelpCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 

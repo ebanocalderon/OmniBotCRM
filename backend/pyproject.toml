@@ -36,6 +36,11 @@ dependencies = [
     "python-multipart>=0.0.9",
     "python-telegram-bot>=21.3",
     "openai>=1.35.0",
+    
+    # Messaging
+    "twilio>=9.1.1",
+    "aiosmtplib>=3.0.1",
+    "aioimaplib>=1.0.1",
 ]
 
 [project.optional-dependencies]

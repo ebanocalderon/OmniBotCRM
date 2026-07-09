@@ -4,15 +4,21 @@ CRM domain — FastAPI router.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
+from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.core.pagination import PaginatedResponse, paginate_query
-from app.crm.models import Activity, Contact, Lead, Opportunity
+from app.crm.models import Activity, Company, Contact, Lead, Opportunity
 from app.crm.schemas import (
     ActivityCreate,
     ActivityResponse,
+    CompanyCreate,
+    CompanyResponse,
+    CompanyUpdate,
     ContactCreate,
+    ContactFilter,
     ContactResponse,
     ContactUpdate,
     LeadCreate,
@@ -25,8 +31,82 @@ from app.crm.schemas import (
 from app.crm.service import CRMService
 from app.dependencies import CurrentTenant, DbSession, Pagination
 from sqlalchemy import select
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/crm", tags=["crm"])
+
+# ── Companies ──────────────────────────────────────────────────────────────────
+
+
+@router.get("/companies", response_model=PaginatedResponse[CompanyResponse])
+async def list_companies(
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+    pagination: Pagination,
+) -> dict:
+    """List all companies."""
+    query = select(Company).where(Company.tenant_id == tenant_ctx.tenant_id)
+    return await paginate_query(db, query, pagination)
+
+
+@router.post("/companies", response_model=CompanyResponse)
+async def create_company(
+    data: CompanyCreate,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> CompanyResponse:
+    """Create a new company."""
+    service = CRMService(db, tenant_ctx.tenant_id)
+    return await service.create_company(data)
+
+
+@router.get("/companies/{company_id}", response_model=CompanyResponse)
+async def get_company(
+    company_id: uuid.UUID,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> CompanyResponse:
+    """Get a specific company."""
+    service = CRMService(db, tenant_ctx.tenant_id)
+    return await service.get_company(company_id)
+
+
+@router.patch("/companies/{company_id}", response_model=CompanyResponse)
+async def update_company(
+    company_id: uuid.UUID,
+    data: CompanyUpdate,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> CompanyResponse:
+    """Update a company."""
+    service = CRMService(db, tenant_ctx.tenant_id)
+    return await service.update_company(company_id, data)
+
+
+@router.delete("/companies/{company_id}")
+async def delete_company(
+    company_id: uuid.UUID,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> dict:
+    """Delete a company."""
+    service = CRMService(db, tenant_ctx.tenant_id)
+    await service.delete_company(company_id)
+    return {"ok": True}
+
+
+@router.get("/companies/{company_id}/contacts", response_model=list[ContactResponse])
+async def list_company_contacts(
+    company_id: uuid.UUID,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> list[ContactResponse]:
+    """List all contacts under a company."""
+    service = CRMService(db, tenant_ctx.tenant_id)
+    await service.get_company(company_id)  # verify exists
+    filters = ContactFilter(company_id=company_id, is_archived=False)
+    return await service.filter_contacts(filters)
+
 
 # ── Contacts ───────────────────────────────────────────────────────────────────
 
@@ -36,10 +116,76 @@ async def list_contacts(
     db: DbSession,
     tenant_ctx: CurrentTenant,
     pagination: Pagination,
+    search: Optional[str] = Query(None, description="Search name, email, phone, company"),
+    source: Optional[str] = Query(None),
+    is_archived: Optional[bool] = Query(False),
+    company_id: Optional[uuid.UUID] = Query(None),
 ) -> dict:
-    """List all contacts with cursor pagination."""
-    query = select(Contact).where(Contact.tenant_id == tenant_ctx.tenant_id)
+    """List contacts with optional filtering."""
+    query = select(Contact).where(
+        Contact.tenant_id == tenant_ctx.tenant_id,
+    )
+    if is_archived is not None:
+        query = query.where(Contact.is_archived == is_archived)
+    if search:
+        from sqlalchemy import or_
+        term = f"%{search}%"
+        query = query.where(or_(
+            Contact.name.ilike(term),
+            Contact.email.ilike(term),
+            Contact.phone.ilike(term),
+            Contact.company.ilike(term),
+        ))
+    if source:
+        query = query.where(Contact.source == source)
+    if company_id:
+        query = query.where(Contact.company_id == company_id)
+
     return await paginate_query(db, query, pagination)
+
+
+@router.post("/contacts/filter", response_model=list[ContactResponse])
+async def filter_contacts(
+    filters: ContactFilter,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> list[ContactResponse]:
+    """Advanced smart contact list filtering."""
+    service = CRMService(db, tenant_ctx.tenant_id)
+    return await service.filter_contacts(filters)
+
+
+class BulkTagRequest(BaseModel):
+    contact_ids: list[uuid.UUID]
+    tags: list[str]
+
+
+@router.post("/contacts/bulk/tag")
+async def bulk_tag_contacts(
+    data: BulkTagRequest,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> dict:
+    """Add tags to multiple contacts at once."""
+    service = CRMService(db, tenant_ctx.tenant_id)
+    count = await service.bulk_tag(data.contact_ids, data.tags)
+    return {"tagged": count}
+
+
+class BulkArchiveRequest(BaseModel):
+    contact_ids: list[uuid.UUID]
+
+
+@router.post("/contacts/bulk/archive")
+async def bulk_archive_contacts(
+    data: BulkArchiveRequest,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> dict:
+    """Archive multiple contacts at once."""
+    service = CRMService(db, tenant_ctx.tenant_id)
+    count = await service.bulk_archive(data.contact_ids)
+    return {"archived": count}
 
 
 @router.post("/contacts", response_model=ContactResponse)
@@ -74,6 +220,17 @@ async def update_contact(
     """Update a contact."""
     service = CRMService(db, tenant_ctx.tenant_id)
     return await service.update_contact(contact_id, data)
+
+
+@router.get("/contacts/{contact_id}/timeline")
+async def get_contact_timeline(
+    contact_id: uuid.UUID,
+    db: DbSession,
+    tenant_ctx: CurrentTenant,
+) -> list[dict]:
+    """Get unified 360° timeline for a contact."""
+    service = CRMService(db, tenant_ctx.tenant_id)
+    return await service.get_contact_timeline(contact_id)
 
 
 # ── Leads ──────────────────────────────────────────────────────────────────────

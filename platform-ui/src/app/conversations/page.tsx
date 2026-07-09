@@ -65,6 +65,12 @@ export default function ConversationsPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedConv, setSelectedConv] = useState(MOCK_CONVERSATIONS[0]);
   const [messageInput, setMessageInput] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [isDialerOpen, setIsDialerOpen] = useState(false);
+  
+  const handleCall = () => {
+    setIsDialerOpen(true);
+  };
 
   return (
     <div className="h-full flex overflow-hidden bg-white">
@@ -157,7 +163,7 @@ export default function ConversationsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 text-slate-400">
-            <button className="p-2 hover:bg-slate-50 hover:text-slate-700 rounded-full transition-colors"><Phone className="w-5 h-5" /></button>
+            <button onClick={handleCall} className="p-2 hover:bg-slate-50 hover:text-slate-700 rounded-full transition-colors"><Phone className="w-5 h-5" /></button>
             <button className="p-2 hover:bg-slate-50 hover:text-slate-700 rounded-full transition-colors"><Video className="w-5 h-5" /></button>
             <button className="p-2 hover:bg-slate-50 hover:text-slate-700 rounded-full transition-colors"><MoreVertical className="w-5 h-5" /></button>
           </div>
@@ -201,25 +207,41 @@ export default function ConversationsPage() {
           })}
         </div>
 
-        {/* Input Area */}
+        {/* Universal Composer Input Area */}
         <div className="p-4 bg-white border-t border-slate-200 shrink-0">
-          <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 p-2 rounded-2xl focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all">
-            <button className="p-2 text-slate-400 hover:text-emerald-600 transition-colors shrink-0">
-              <Paperclip className="w-5 h-5" />
-            </button>
-            <textarea 
-              value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 bg-transparent border-none focus:ring-0 resize-none max-h-32 min-h-[44px] py-3 text-sm text-slate-700"
-              rows={1}
-            />
-            <button className="p-2 text-slate-400 hover:text-emerald-600 transition-colors shrink-0 mb-1">
-              <Smile className="w-5 h-5" />
-            </button>
-            <button className="p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-colors shrink-0 mb-0.5">
-              <Send className="w-4 h-4" />
-            </button>
+          <div className="flex flex-col bg-slate-50 border border-slate-200 rounded-2xl focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all overflow-hidden">
+            
+            {/* Conditional Email Subject Line */}
+            {selectedConv.channel === "email" && (
+              <div className="px-4 py-2 border-b border-slate-200 bg-white">
+                <input 
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  placeholder="Subject"
+                  className="w-full bg-transparent border-none focus:ring-0 text-sm font-medium text-slate-800 placeholder-slate-400"
+                />
+              </div>
+            )}
+            
+            <div className="flex items-end gap-2 p-2">
+              <button className="p-2 text-slate-400 hover:text-emerald-600 transition-colors shrink-0">
+                <Paperclip className="w-5 h-5" />
+              </button>
+              <textarea 
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
+                placeholder={selectedConv.channel === "email" ? "Type your email..." : "Type your message..."}
+                className="flex-1 bg-transparent border-none focus:ring-0 resize-none max-h-32 min-h-[44px] py-3 text-sm text-slate-700"
+                rows={selectedConv.channel === "email" ? 3 : 1}
+              />
+              <button className="p-2 text-slate-400 hover:text-emerald-600 transition-colors shrink-0 mb-1">
+                <Smile className="w-5 h-5" />
+              </button>
+              <button className="p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-colors shrink-0 mb-0.5">
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -300,6 +322,40 @@ export default function ConversationsPage() {
           </div>
         </div>
       </div>
+      
+      {/* Floating Call Widget Overlay */}
+      {isDialerOpen && (
+        <div className="absolute top-20 right-8 w-72 bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden z-50 flex flex-col">
+          <div className="p-6 text-center text-white border-b border-slate-700">
+            <div className="w-16 h-16 rounded-full bg-slate-800 mx-auto mb-3 flex items-center justify-center text-xl font-bold border-2 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+              {selectedConv.contactName.charAt(0)}
+            </div>
+            <h3 className="font-bold text-lg">{selectedConv.contactName}</h3>
+            <p className="text-emerald-400 text-sm mb-2">00:03</p>
+            <p className="text-xs text-slate-400">+1 (555) 019-2834</p>
+          </div>
+          <div className="p-6 bg-slate-800 grid grid-cols-3 gap-4">
+            <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white transition-colors">
+              <div className="p-3 bg-slate-700 rounded-full"><Phone className="w-4 h-4" /></div>
+              <span className="text-[10px]">Mute</span>
+            </button>
+            <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white transition-colors">
+              <div className="p-3 bg-slate-700 rounded-full"><MoreVertical className="w-4 h-4" /></div>
+              <span className="text-[10px]">Keypad</span>
+            </button>
+            <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white transition-colors">
+              <div className="p-3 bg-slate-700 rounded-full"><User className="w-4 h-4" /></div>
+              <span className="text-[10px]">Add</span>
+            </button>
+          </div>
+          <div className="p-4 bg-slate-900 flex justify-center">
+            <button onClick={() => setIsDialerOpen(false)} className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white rounded-full font-semibold shadow-lg transition-colors flex items-center gap-2">
+              <Phone className="w-4 h-4 rotate-[135deg]" /> End Call
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -1,19 +1,20 @@
 """
 CRM domain — SQLAlchemy models.
 
-Core CRM entities: Contact, Lead, Opportunity, Pipeline, Activity.
+Core CRM entities: Contact, Lead, Opportunity, Pipeline, Activity, Company.
 All models are tenant-scoped via tenant_id.
 """
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import (
     Boolean,
     Date,
+    DateTime,
     ForeignKey,
     Integer,
     Numeric,
@@ -24,6 +25,44 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+
+class Company(Base):
+    """
+    A company or account that groups individual contacts.
+
+    Mirrors the GHL "Company Object" concept — contacts can belong
+    to a parent company for B2B relationship tracking.
+    """
+
+    __tablename__ = "companies"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    domain: Mapped[Optional[str]] = mapped_column(String(255))
+    industry: Mapped[Optional[str]] = mapped_column(String(100))
+    size: Mapped[Optional[str]] = mapped_column(
+        String(50)
+    )  # 1-10 | 11-50 | 51-200 | 201-500 | 500+
+    phone: Mapped[Optional[str]] = mapped_column(String(50))
+    website: Mapped[Optional[str]] = mapped_column(String(500))
+    address: Mapped[Optional[str]] = mapped_column(Text)
+    custom_fields: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
+    tags: Mapped[Optional[list]] = mapped_column(JSONB, default=list)
+
+    # Relationships
+    contacts: Mapped[list["Contact"]] = relationship(
+        "Contact", back_populates="company_obj", lazy="selectin"
+    )
+
+    __table_args__ = (
+        {"comment": "Company/account entities — tenant-scoped"},
+    )
+
+    def __repr__(self) -> str:
+        return f"<Company id={self.id} name={self.name} tenant={self.tenant_id}>"
 
 
 class Contact(Base):
@@ -49,6 +88,11 @@ class Contact(Base):
         String(50)
     )  # web, telegram, whatsapp, api, import
 
+    # Company relationship (GHL Company Object)
+    company_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id"), index=True
+    )
+
     # Flexible custom fields per tenant
     custom_fields: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
 
@@ -61,7 +105,16 @@ class Contact(Base):
     # Tags for segmentation
     tags: Mapped[Optional[list]] = mapped_column(JSONB, default=list)
 
+    # Soft delete and activity tracking
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    last_activity_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
+    )
+
     # Relationships
+    company_obj: Mapped[Optional["Company"]] = relationship(
+        "Company", back_populates="contacts"
+    )
     conversations: Mapped[list["Conversation"]] = relationship(
         "Conversation", back_populates="contact", lazy="selectin"
     )
