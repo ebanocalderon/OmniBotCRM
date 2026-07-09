@@ -19,6 +19,8 @@ from app.automations.models import AutomationRule
 from app.payments.models import Invoice, Payment, PaymentLink
 from app.automations.models import Workflow, WorkflowStep, WorkflowExecution, WorkflowExecutionLog
 from app.scheduling.models import Calendar, Availability, Appointment
+from app.reputation.models import Review, ReviewRequest
+from app.social.models import SocialAccount, SocialPost
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
