@@ -15,7 +15,6 @@ from app.tenants.models import Tenant, User
 from app.crm.models import Contact, Lead, Opportunity, Pipeline, Activity, Company
 from app.messaging.models import Inbox, Message, Conversation, CallRecord, EmailMessage
 from app.ai.models import AIConfig, ConversationMemory, AIAgent, ContentGeneration
-from app.automations.models import AutomationRule
 from app.payments.models import Invoice, Payment, PaymentLink
 from app.automations.models import Workflow, WorkflowStep, WorkflowExecution, WorkflowExecutionLog
 from app.scheduling.models import Calendar, Availability, Appointment
