@@ -4,9 +4,11 @@ Enterprise SaaS platform combining AI, CRM, omnichannel messaging, workflow auto
 
 ## Stack
 
-- **Backend**: Python 3.11 · FastAPI · SQLAlchemy async · Alembic · PostgreSQL (pgvector)
-- **Frontend**: Next.js 16 (App Router) · TypeScript · Tailwind CSS 4
+- **Backend**: Python 3.11 · FastAPI · SQLAlchemy async · PostgreSQL (pgvector) + Row-Level Security (RLS)
+- **Frontend**: Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Puck/GrapesJS (Page Builder)
 - **Infra**: Docker Compose · Redis · Keycloak (auth/SSO)
+- **Ingress/Proxy**: Caddy (for automated SSL / custom domains)
+- **Background Jobs**: ARQ / Celery
 
 ## Commands
 

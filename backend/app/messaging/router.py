@@ -13,6 +13,9 @@ from app.messaging.schemas import (
 )
 from app.messaging.service import MessagingService
 from app.messaging.webhooks.whatsapp import router as whatsapp_router
+from app.messaging.channels.sms_twilio import TwilioSMSDriver
+from app.messaging.channels.voice_twilio import TwilioVoiceDriver
+from app.messaging.channels.email_smtp import SMTPEmailDriver
 
 router = APIRouter(prefix="/messaging", tags=["messaging"])
 router.include_router(whatsapp_router, prefix="/webhooks")
@@ -108,6 +111,55 @@ async def create_message(
     current_user: User = Depends(get_current_user),
     service: MessagingService = Depends(get_messaging_service)
 ):
-    # Ensure conversation_id in URL matches payload
+    # Verify conversation exists and get inbox
+    conv = await service.get_conversation(conversation_id, current_user.tenant_id)
+    inbox = await service.get_inbox(conv.inbox_id, current_user.tenant_id)
+    
+    # 1. Delegate to the correct channel driver before saving to DB
+    if inbox.channel_type == "sms":
+        driver = TwilioSMSDriver(inbox.channel_config)
+        # Assuming contact phone is stored in conv.contact.phone
+        to_number = conv.contact.phone
+        if to_number:
+            result = await driver.send_message(to_number, data.content)
+            data.channel_metadata = result
+    
+    elif inbox.channel_type == "email":
+        driver = SMTPEmailDriver(inbox.channel_config)
+        to_email = conv.contact.email
+        if to_email:
+            result = await driver.send_email(to_email, "Re: Support", html_body=data.content)
+            data.channel_metadata = result
+
+    # 2. Save to DB
     data.conversation_id = conversation_id
     return await service.create_message(current_user.tenant_id, data)
+
+# --- Webhooks & Voice ---
+
+@router.post("/webhooks/twilio/sms")
+async def twilio_sms_webhook(
+    # Twilio sends Form data, but we can capture it directly or via Request
+    # Simplified for the plan
+):
+    return {"status": "received"}
+
+@router.post("/webhooks/twilio/voice")
+async def twilio_voice_webhook():
+    return {"status": "received"}
+
+@router.post("/calls/initiate")
+async def initiate_call(
+    contact_id: UUID,
+    inbox_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: MessagingService = Depends(get_messaging_service)
+):
+    inbox = await service.get_inbox(inbox_id, current_user.tenant_id)
+    if inbox.channel_type != "voice":
+        raise ValueError("Inbox is not a voice channel")
+        
+    driver = TwilioVoiceDriver(inbox.channel_config)
+    # We would fetch the contact's phone number here
+    # result = await driver.initiate_outbound_call(contact.phone, str(current_user.id))
+    return {"status": "initiating"}

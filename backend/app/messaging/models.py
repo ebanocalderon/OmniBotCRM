@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import uuid
 from typing import Optional
+from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -140,12 +141,21 @@ class Message(Base):
 
     # Attachments and rich content metadata
     custom_data: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
+    
+    # Channel-specific metadata (WhatsApp template IDs, email headers, etc.)
+    channel_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
 
     # Private flag (internal notes, not visible to contact)
     private: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Timestamps for delivery tracking
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     # Relationships
     conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+    call_record: Mapped[Optional["CallRecord"]] = relationship(back_populates="message", uselist=False)
+    email_record: Mapped[Optional["EmailMessage"]] = relationship(back_populates="message", uselist=False)
 
     __table_args__ = (
         {"comment": "Individual messages within conversations — tenant-scoped"},
@@ -153,6 +163,49 @@ class Message(Base):
 
     def __repr__(self) -> str:
         return f"<Message id={self.id} type={self.sender_type}>"
+
+
+class CallRecord(Base):
+    """
+    Stores metadata for Voice/VoIP calls (Twilio).
+    Associated 1-to-1 with a Message representing the call event in the timeline.
+    """
+    __tablename__ = "call_records"
+    
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    message_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=False, index=True)
+    
+    direction: Mapped[str] = mapped_column(String(20)) # inbound / outbound
+    duration: Mapped[Optional[int]] = mapped_column(Integer) # seconds
+    recording_url: Mapped[Optional[str]] = mapped_column(String(1024))
+    status: Mapped[str] = mapped_column(String(50)) # queued, ringing, in-progress, completed, busy, failed
+    from_number: Mapped[Optional[str]] = mapped_column(String(50))
+    to_number: Mapped[Optional[str]] = mapped_column(String(50))
+    
+    # Relationships
+    message: Mapped["Message"] = relationship(back_populates="call_record")
+
+
+class EmailMessage(Base):
+    """
+    Stores metadata for Emails.
+    Associated 1-to-1 with a Message representing the email event in the timeline.
+    """
+    __tablename__ = "email_messages"
+    
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    message_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=False, index=True)
+    
+    subject: Mapped[Optional[str]] = mapped_column(String(512))
+    html_body: Mapped[Optional[str]] = mapped_column(Text)
+    text_body: Mapped[Optional[str]] = mapped_column(Text)
+    headers: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
+    attachments: Mapped[Optional[list]] = mapped_column(JSONB, default=list)
+    
+    # Relationships
+    message: Mapped["Message"] = relationship(back_populates="email_record")
 
 
 # Import here to avoid circular imports — AIConfig references Inbox

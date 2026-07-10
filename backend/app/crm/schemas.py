@@ -11,6 +11,46 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# ── Company ─────────────────────────────────────────────────────────────────────
+
+
+class CompanyBase(BaseModel):
+    name: str = Field(..., max_length=255)
+    domain: Optional[str] = Field(None, max_length=255)
+    industry: Optional[str] = Field(None, max_length=100)
+    size: Optional[str] = Field(None, max_length=50)
+    phone: Optional[str] = Field(None, max_length=50)
+    website: Optional[str] = Field(None, max_length=500)
+    address: Optional[str] = None
+    custom_fields: Optional[dict] = None
+    tags: Optional[list[str]] = None
+
+
+class CompanyCreate(CompanyBase):
+    pass
+
+
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=255)
+    domain: Optional[str] = Field(None, max_length=255)
+    industry: Optional[str] = Field(None, max_length=100)
+    size: Optional[str] = Field(None, max_length=50)
+    phone: Optional[str] = Field(None, max_length=50)
+    website: Optional[str] = Field(None, max_length=500)
+    address: Optional[str] = None
+    custom_fields: Optional[dict] = None
+    tags: Optional[list[str]] = None
+
+
+class CompanyResponse(CompanyBase):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ── Contact ───────────────────────────────────────────────────────────────────
 
 
@@ -19,6 +59,7 @@ class ContactBase(BaseModel):
     phone: Optional[str] = Field(None, max_length=50)
     name: Optional[str] = Field(None, max_length=255)
     company: Optional[str] = Field(None, max_length=255)
+    company_id: Optional[uuid.UUID] = None
     title: Optional[str] = Field(None, max_length=255)
     avatar_url: Optional[str] = Field(None, max_length=500)
     source: Optional[str] = Field(None, max_length=50)
@@ -39,10 +80,25 @@ class ContactResponse(ContactBase):
     id: uuid.UUID
     tenant_id: uuid.UUID
     chatwoot_contact_id: Optional[int] = None
+    is_archived: bool = False
+    last_activity_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ContactFilter(BaseModel):
+    """Advanced filter parameters for smart contact lists."""
+    search: Optional[str] = None
+    tags: Optional[list[str]] = None
+    source: Optional[str] = None
+    company_id: Optional[uuid.UUID] = None
+    is_archived: Optional[bool] = False
+    has_email: Optional[bool] = None
+    has_phone: Optional[bool] = None
+    created_after: Optional[datetime] = None
+    created_before: Optional[datetime] = None
 
 
 # ── Lead ──────────────────────────────────────────────────────────────────────
@@ -106,6 +162,9 @@ class OpportunityBase(BaseModel):
     probability: Optional[int] = None
     assigned_to: Optional[uuid.UUID] = None
     custom_fields: Optional[dict] = None
+    won_at: Optional[datetime] = None
+    lost_at: Optional[datetime] = None
+    lost_reason: Optional[str] = None
 
 
 class OpportunityCreate(OpportunityBase):
@@ -120,6 +179,9 @@ class OpportunityUpdate(BaseModel):
     probability: Optional[int] = None
     assigned_to: Optional[uuid.UUID] = None
     custom_fields: Optional[dict] = None
+    won_at: Optional[datetime] = None
+    lost_at: Optional[datetime] = None
+    lost_reason: Optional[str] = None
 
 
 class OpportunityResponse(OpportunityBase):

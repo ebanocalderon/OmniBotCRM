@@ -61,6 +61,7 @@ class MessageBase(BaseModel):
     source: str = Field(default="platform", max_length=30)
     private: bool = False
     custom_data: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    channel_metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
     chatwoot_message_id: Optional[int] = None
 
 class MessageCreate(MessageBase):
