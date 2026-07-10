@@ -2,9 +2,15 @@
 
 import { Phone, Megaphone, Bell, User, ChevronDown, HelpCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
+import { usePathname } from "next/navigation";
 
 export function Navbar() {
   const { logout } = useAuth();
+  const pathname = usePathname();
+
+  if (pathname === "/login" || pathname === "/") {
+    return null;
+  }
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 shadow-sm z-10">
