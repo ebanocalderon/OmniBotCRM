@@ -43,12 +43,14 @@ from app.messaging.schemas import (
 from app.messaging.service import MessagingService
 from app.messaging.websocket import manager
 from app.messaging.webhooks.whatsapp import router as whatsapp_router
+from app.messaging.webhooks.chatwoot import router as chatwoot_webhook_router
 from app.messaging.channels.sms_twilio import TwilioSMSDriver
 from app.messaging.channels.voice_twilio import TwilioVoiceDriver
 from app.messaging.channels.email_smtp import SMTPEmailDriver
 
 router = APIRouter(prefix="/messaging", tags=["messaging"])
 router.include_router(whatsapp_router, prefix="/webhooks")
+router.include_router(chatwoot_webhook_router, prefix="/webhooks")
 
 def get_messaging_service(db: AsyncSession = Depends(get_db)) -> MessagingService:
     return MessagingService(db)
@@ -171,6 +173,20 @@ async def create_message(
         to_email = conv.contact.email
         if to_email:
             result = await driver.send_email(to_email, "Re: Support", html_body=data.content)
+            data.channel_metadata = result
+            
+    elif inbox.channel_type == "chatwoot":
+        import os
+        from app.messaging.drivers.chatwoot.client import ChatwootClient
+        cw_base_url = os.getenv("CHATWOOT_BASE_URL", "http://localhost:3000")
+        cw_api_token = os.getenv("CHATWOOT_API_TOKEN", "")
+        cw_account_id = os.getenv("CHATWOOT_ACCOUNT_ID", "1")
+        
+        client = ChatwootClient(cw_base_url, cw_api_token, cw_account_id)
+        
+        cw_conv_id = conv.channel_metadata.get("chatwoot_conversation_id")
+        if cw_conv_id:
+            result = await client.send_message(cw_conv_id, data.content)
             data.channel_metadata = result
 
     # 2. Save to DB
