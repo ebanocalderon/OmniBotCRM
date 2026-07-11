@@ -240,5 +240,141 @@ async def initiate_call(
         
     driver = TwilioVoiceDriver(inbox.channel_config)
     # We would fetch the contact's phone number here
-    # result = await driver.initiate_outbound_call(contact.phone, str(current_user.id))
     return {"status": "initiating"}
+
+# --- Webchat API ---
+
+from pydantic import BaseModel
+class WebchatMessageRequest(BaseModel):
+    session_id: str
+    content: str
+    name: str = "Website Visitor"
+
+@router.post("/webchat/{tenant_id}/messages")
+async def receive_webchat_message(
+    tenant_id: UUID,
+    data: WebchatMessageRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
+    from sqlalchemy import select
+    from app.messaging.models import Inbox, Conversation, Message
+    from app.crm.models import Contact
+    
+    # 1. Find the webchat inbox for this tenant
+    inbox_res = await db.execute(select(Inbox).where(Inbox.tenant_id == tenant_id, Inbox.channel_type == "web").limit(1))
+    inbox = inbox_res.scalar_one_or_none()
+    if not inbox:
+        # Auto-create webchat inbox if it doesn't exist
+        inbox = Inbox(tenant_id=tenant_id, name="Web Chat", channel_type="web", channel_config={})
+        db.add(inbox)
+        await db.flush()
+        
+    # 2. Find or create Contact based on session_id
+    contact_res = await db.execute(
+        select(Contact).where(Contact.tenant_id == tenant_id, Contact.custom_data.op('->>')('webchat_session') == data.session_id).limit(1)
+    )
+    contact = contact_res.scalar_one_or_none()
+    
+    if not contact:
+        contact = Contact(
+            tenant_id=tenant_id,
+            first_name=data.name,
+            source="webchat",
+            custom_data={"webchat_session": data.session_id}
+        )
+        db.add(contact)
+        await db.flush()
+        
+    # 3. Find open conversation or create new
+    conv_res = await db.execute(
+        select(Conversation).where(
+            Conversation.tenant_id == tenant_id,
+            Conversation.contact_id == contact.id,
+            Conversation.inbox_id == inbox.id,
+            Conversation.status == "open"
+        ).limit(1)
+    )
+    conversation = conv_res.scalar_one_or_none()
+    
+    if not conversation:
+        conversation = Conversation(
+            tenant_id=tenant_id,
+            contact_id=contact.id,
+            inbox_id=inbox.id,
+            status="open",
+            channel_metadata={"webchat_session": data.session_id}
+        )
+        db.add(conversation)
+        await db.flush()
+        
+    # 4. Save Message
+    msg = Message(
+        tenant_id=tenant_id,
+        conversation_id=conversation.id,
+        sender_type="contact",
+        content=data.content,
+        source="webchat"
+    )
+    db.add(msg)
+    await db.commit()
+    
+    # 5. Broadcast to dashboard
+    await manager.broadcast_to_tenant(tenant_id, {
+        "event": "new_message",
+        "message": {
+            "id": str(msg.id),
+            "conversation_id": str(msg.conversation_id),
+            "content": msg.content,
+            "sender_type": msg.sender_type,
+            "created_at": str(msg.created_at)
+        }
+    })
+    
+    # 6. Trigger AI processing in background
+    background_tasks.add_task(process_ai_reply, tenant_id, conversation.id, inbox.id, db)
+    
+    return {"status": "success"}
+
+@router.get("/webchat/{tenant_id}/messages")
+async def get_webchat_messages(
+    tenant_id: UUID,
+    session_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    from sqlalchemy import select
+    from app.messaging.models import Conversation, Message
+    from app.crm.models import Contact
+    
+    contact_res = await db.execute(
+        select(Contact).where(Contact.tenant_id == tenant_id, Contact.custom_data.op('->>')('webchat_session') == session_id).limit(1)
+    )
+    contact = contact_res.scalar_one_or_none()
+    
+    if not contact:
+        return []
+        
+    conv_res = await db.execute(
+        select(Conversation).where(
+            Conversation.tenant_id == tenant_id,
+            Conversation.contact_id == contact.id
+        ).order_by(Conversation.created_at.desc()).limit(1)
+    )
+    conversation = conv_res.scalar_one_or_none()
+    
+    if not conversation:
+        return []
+        
+    msg_res = await db.execute(
+        select(Message).where(Message.conversation_id == conversation.id).order_by(Message.created_at.asc())
+    )
+    messages = msg_res.scalars().all()
+    
+    return [
+        {
+            "id": str(m.id),
+            "content": m.content,
+            "sender_type": m.sender_type,
+            "created_at": str(m.created_at)
+        } for m in messages
+    ]

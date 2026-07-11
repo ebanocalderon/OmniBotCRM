@@ -15,12 +15,12 @@ export default function ChatIntegrationsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const scriptSnippet = `<script>
-  window.OmniBotConfig = { tenantId: "demo-biz-2" };
+  window.OmniBotConfig = { tenantId: "741fb61f-8508-4463-a6ff-393d67e59a48", apiUrl: "http://10.0.0.41:8000/api/v1" };
   (function(d, s, id) {
     var js, fjs = d.getElementsByTagName(s)[0];
     if (d.getElementById(id)) return;
     js = d.createElement(s); js.id = id;
-    js.src = "https://cdn.omnibot.io/widget.js";
+    js.src = "http://10.0.0.41:3000/widget.js";
     fjs.parentNode.insertBefore(js, fjs);
   }(document, 'script', 'omnibot-jssdk'));
 </script>`;
