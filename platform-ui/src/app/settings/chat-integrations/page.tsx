@@ -186,7 +186,7 @@ export default function ChatIntegrationsPage() {
             </div>
             <form onSubmit={handleSaveMeta} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Facebook Page ID</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Meta Page ID</label>
                 <input 
                   type="text" 
                   value={metaConfig.pageId}
@@ -197,7 +197,7 @@ export default function ChatIntegrationsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Page Access Token</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Meta Access Token</label>
                 <input 
                   type="password" 
                   value={metaConfig.accessToken}
