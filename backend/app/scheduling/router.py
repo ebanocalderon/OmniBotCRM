@@ -29,6 +29,27 @@ async def create_calendar(
     service = SchedulingService(db, tenant_id)
     return await service.create_calendar(data)
 
+@router.get("/appointments", response_model=List[AppointmentResponse])
+async def list_appointments(
+    tenant_id: uuid.UUID = Depends(get_current_tenant_id),
+    db: AsyncSession = Depends(get_db)
+):
+    from sqlalchemy import select
+    from app.scheduling.models import Appointment, Calendar
+    
+    query = select(Appointment).join(Calendar).where(Calendar.tenant_id == tenant_id)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+@router.post("/appointments", response_model=AppointmentResponse)
+async def create_appointment_internal(
+    data: AppointmentCreate,
+    tenant_id: uuid.UUID = Depends(get_current_tenant_id),
+    db: AsyncSession = Depends(get_db)
+):
+    service = SchedulingService(db, tenant_id)
+    return await service.book_appointment(data)
+
 @public_router.get("/calendars/{slug}/slots")
 async def get_slots(
     slug: str,

@@ -116,6 +116,9 @@ class AIAgent(Base):
     agent_type: Mapped[str] = mapped_column(String(50), nullable=False) # conversation, content, workflow, review
     
     provider: Mapped[str] = mapped_column(String(50), default="openai")
+    model: Mapped[str] = mapped_column(String(100), default="gpt-4-turbo")
+    system_prompt: Mapped[Optional[str]] = mapped_column(Text)
+    temperature: Mapped[float] = mapped_column(default=0.7)
     prompt_config: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
     
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

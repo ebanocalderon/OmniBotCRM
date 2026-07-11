@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.tenants.dependencies import get_current_tenant_id
 from app.ai.models import AIAgent, ContentGeneration
+from app.ai.service import AIService
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -16,6 +17,9 @@ class AIAgentResponse(BaseModel):
     name: str
     agent_type: str
     provider: str
+    model: str
+    system_prompt: Optional[str]
+    temperature: float
     is_active: bool
     
     class Config:
@@ -33,6 +37,9 @@ class AIAgentCreate(BaseModel):
     name: str
     agent_type: str
     provider: str = "openai"
+    model: str = "gpt-4-turbo"
+    system_prompt: Optional[str] = None
+    temperature: float = 0.7
 
 @router.post("/agents", response_model=AIAgentResponse)
 async def create_agent(
@@ -44,7 +51,10 @@ async def create_agent(
         tenant_id=tenant_id,
         name=data.name,
         agent_type=data.agent_type,
-        provider=data.provider
+        provider=data.provider,
+        model=data.model,
+        system_prompt=data.system_prompt,
+        temperature=data.temperature
     )
     db.add(agent)
     await db.commit()
@@ -76,3 +86,17 @@ async def generate_content(
     await db.commit()
     
     return {"output": mock_output}
+
+class SimulateRequest(BaseModel):
+    prompt: str
+    agent_config: dict
+
+@router.post("/simulate")
+async def simulate_agent(
+    data: SimulateRequest,
+    tenant_id: uuid.UUID = Depends(get_current_tenant_id),
+    db: AsyncSession = Depends(get_db)
+):
+    service = AIService(db)
+    response = await service.ask_agent(data.prompt, data.agent_config)
+    return {"reply": response}

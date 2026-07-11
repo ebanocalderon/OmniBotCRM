@@ -29,8 +29,24 @@ export default function ChatIntegrationsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const toggle = (key: keyof typeof active) => {
-    setActive({ ...active, [key]: !active[key] });
+  const toggle = async (key: keyof typeof active) => {
+    const newValue = !active[key];
+    // Optimistic update
+    setActive({ ...active, [key]: newValue });
+    
+    try {
+      // Simulate API Patch
+      console.log(`Patching integration ${key} to ${newValue}`);
+      // await fetch('/api/v1/settings/integrations', { 
+      //   method: 'PATCH', 
+      //   body: JSON.stringify({ [key]: newValue }) 
+      // });
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      console.error("Failed to update integration setting", error);
+      // Revert optimistic update
+      setActive({ ...active, [key]: !newValue });
+    }
   };
 
   return (

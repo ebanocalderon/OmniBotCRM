@@ -1,7 +1,36 @@
 from uuid import UUID
 from typing import List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
+
+async def process_ai_reply(tenant_id: UUID, conversation_id: UUID, inbox_id: UUID, db_session):
+    from app.ai.service import AIService
+    from app.messaging.websocket import manager
+    service = AIService(db_session)
+    reply = await service.generate_reply(conversation_id, tenant_id, inbox_id)
+    
+    if reply:
+        # Save AI reply to DB
+        from app.messaging.service import MessagingService
+        from app.messaging.schemas import MessageCreate
+        msg_svc = MessagingService(db_session)
+        ai_msg = await msg_svc.create_message(tenant_id, MessageCreate(
+            conversation_id=conversation_id,
+            content=reply,
+            sender_type="ai_agent"
+        ))
+        
+        # Broadcast the AI reply
+        await manager.broadcast_to_tenant(tenant_id, {
+            "event": "new_message",
+            "message": {
+                "id": str(ai_msg.id),
+                "conversation_id": str(ai_msg.conversation_id),
+                "content": ai_msg.content,
+                "sender_type": ai_msg.sender_type,
+                "created_at": str(ai_msg.created_at)
+            }
+        })
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -12,6 +41,7 @@ from app.messaging.schemas import (
     MessageCreate, MessageResponse
 )
 from app.messaging.service import MessagingService
+from app.messaging.websocket import manager
 from app.messaging.webhooks.whatsapp import router as whatsapp_router
 from app.messaging.channels.sms_twilio import TwilioSMSDriver
 from app.messaging.channels.voice_twilio import TwilioVoiceDriver
@@ -22,6 +52,16 @@ router.include_router(whatsapp_router, prefix="/webhooks")
 
 def get_messaging_service(db: AsyncSession = Depends(get_db)) -> MessagingService:
     return MessagingService(db)
+
+@router.websocket("/ws/{tenant_id}")
+async def websocket_endpoint(websocket: WebSocket, tenant_id: UUID):
+    await manager.connect(websocket, tenant_id)
+    try:
+        while True:
+            # We don't expect messages from client via WS for now, but keep connection alive
+            data = await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, tenant_id)
 
 # --- Inboxes ---
 
@@ -108,8 +148,10 @@ async def list_messages(
 async def create_message(
     conversation_id: UUID,
     data: MessageCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    service: MessagingService = Depends(get_messaging_service)
+    service: MessagingService = Depends(get_messaging_service),
+    db: AsyncSession = Depends(get_db)
 ):
     # Verify conversation exists and get inbox
     conv = await service.get_conversation(conversation_id, current_user.tenant_id)
@@ -133,7 +175,27 @@ async def create_message(
 
     # 2. Save to DB
     data.conversation_id = conversation_id
-    return await service.create_message(current_user.tenant_id, data)
+    new_message = await service.create_message(current_user.tenant_id, data)
+    
+    # 3. Broadcast over WebSocket
+    await manager.broadcast_to_tenant(current_user.tenant_id, {
+        "event": "new_message",
+        "message": {
+            "id": str(new_message.id),
+            "conversation_id": str(new_message.conversation_id),
+            "content": new_message.content,
+            "sender_type": new_message.sender_type,
+            "created_at": str(new_message.created_at)
+        }
+    })
+    
+    # 4. Trigger AI if sender is user/customer
+    if data.sender_type == "user":
+        # Pass a fresh session or the existing one? FastAPI BackgroundTasks with SQLAlchemy AsyncSession is tricky.
+        # Actually, using the same session might fail if it's closed, but Depends(get_db) keeps it alive until background task finishes in FastAPI.
+        background_tasks.add_task(process_ai_reply, current_user.tenant_id, conversation_id, inbox.id, db)
+    
+    return new_message
 
 # --- Webhooks & Voice ---
 
