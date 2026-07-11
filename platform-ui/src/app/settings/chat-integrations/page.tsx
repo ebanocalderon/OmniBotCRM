@@ -90,18 +90,17 @@ export default function ChatIntegrationsPage() {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">Facebook Messenger</h3>
-                <p className="text-xs text-gray-500">Facebook Pages</p>
+                <p className="text-xs text-gray-500">Powered by Chatwoot</p>
               </div>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" checked={active.messenger} onChange={() => toggle("messenger")} />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-            </label>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              Active
+            </span>
           </div>
           <p className="text-sm text-gray-600 flex-1">Connect your Facebook page to reply to Messenger inquiries seamlessly.</p>
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-            <span className="text-sm text-gray-500">Connected to <strong className="text-gray-900">Demo Biz Page</strong></span>
-            <button className="text-red-500 text-sm font-medium hover:text-red-600">Disconnect</button>
+            <span className="text-sm text-gray-500">Integration managed externally</span>
+            <a href={process.env.NEXT_PUBLIC_CHATWOOT_BASE_URL || "http://10.0.0.41:3000"} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm font-medium hover:text-blue-700">Open Dashboard →</a>
           </div>
         </div>
       </div>
