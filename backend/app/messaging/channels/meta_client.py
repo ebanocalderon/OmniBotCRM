@@ -4,7 +4,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-class FacebookClient:
+class MetaClient:
     def __init__(self, page_access_token: str, page_id: str = "me"):
         # Graph API v19.0
         self.base_url = f"https://graph.facebook.com/v19.0/{page_id}/messages"

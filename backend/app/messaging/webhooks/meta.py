@@ -10,11 +10,11 @@ from app.crm.models import Contact
 from app.ai.service import AIService
 from app.automations.service import AutomationEngine
 from app.messaging.websocket import manager
-from app.messaging.channels.facebook_client import FacebookClient
+from app.messaging.channels.meta_client import MetaClient
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/facebook", tags=["webhooks", "facebook"])
+router = APIRouter(prefix="/meta", tags=["webhooks", "meta"])
 
 @router.get("")
 async def verify_webhook(request: Request):
@@ -28,7 +28,7 @@ async def verify_webhook(request: Request):
 
     # In a real app, verify_token should match the one configured in the Meta App
     if mode == "subscribe" and token:
-        logger.info(f"Facebook Webhook verified with token: {token}")
+        logger.info(f"Meta Webhook verified with token: {token}")
         return Response(content=challenge, media_type="text/plain")
 
     raise HTTPException(status_code=403, detail="Invalid verification token")
@@ -36,13 +36,13 @@ async def verify_webhook(request: Request):
 @router.post("")
 async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
     """
-    Receive incoming messages and status updates from Meta Graph API.
+    Receive incoming messages and status updates from Meta Graph API (FB & IG).
     """
     try:
         body = await request.json()
-        logger.info(f"Received Facebook webhook payload: {body}")
+        logger.info(f"Received Meta webhook payload: {body}")
         
-        if body.get("object") != "page":
+        if body.get("object") not in ["page", "instagram"]:
             return Response(status_code=404)
 
         for entry in body.get("entry", []):
@@ -56,28 +56,28 @@ async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
                 recipient_psid = messaging_event["recipient"]["id"]
                 message_text = messaging_event["message"].get("text", "")
                 
-                logger.info(f"New Facebook Message from {sender_psid} to {page_id}: {message_text}")
+                logger.info(f"New Meta Message from {sender_psid} to {page_id}: {message_text}")
                 
                 # 1. Find the inbox configured for this page_id
                 inbox_stmt = select(Inbox).where(
-                    Inbox.channel_type == "facebook",
+                    Inbox.channel_type == "meta",
                     Inbox.channel_config.op('->>')('pageId') == str(page_id)
                 ).limit(1)
                 inbox_res = await db.execute(inbox_stmt)
                 inbox = inbox_res.scalar_one_or_none()
                 
-                # Fallback to any active facebook inbox if page_id match fails (for simple CRM usage)
+                # Fallback to any active meta inbox if page_id match fails
                 if not inbox:
-                    inbox_res = await db.execute(select(Inbox).where(Inbox.channel_type == "facebook").limit(1))
+                    inbox_res = await db.execute(select(Inbox).where(Inbox.channel_type == "meta").limit(1))
                     inbox = inbox_res.scalar_one_or_none()
                 
                 if not inbox:
-                    logger.error(f"No Facebook inbox found for page ID: {page_id}.")
+                    logger.error(f"No Meta inbox found for page ID: {page_id}.")
                     continue
                     
                 # 2. Find or create Contact
                 contact_stmt = select(Contact).where(
-                    Contact.custom_data.op('->>')('facebook_psid') == str(sender_psid), 
+                    Contact.custom_data.op('->>')('meta_psid') == str(sender_psid), 
                     Contact.tenant_id == inbox.tenant_id
                 ).limit(1)
                 contact_res = await db.execute(contact_stmt)
@@ -86,9 +86,9 @@ async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
                 if not contact:
                     contact = Contact(
                         tenant_id=inbox.tenant_id,
-                        first_name="Facebook User",
-                        source="facebook",
-                        custom_data={"facebook_psid": sender_psid}
+                        first_name="Meta User",
+                        source="meta",
+                        custom_data={"meta_psid": sender_psid}
                     )
                     db.add(contact)
                     await db.flush()
@@ -108,7 +108,7 @@ async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
                         contact_id=contact.id,
                         inbox_id=inbox.id,
                         status="open",
-                        channel_metadata={"sender_psid": sender_psid}
+                        channel_metadata={"meta_psid": sender_psid}
                     )
                     db.add(conversation)
                     await db.flush()
@@ -119,7 +119,7 @@ async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
                     conversation_id=conversation.id,
                     sender_type="contact",
                     content=message_text,
-                    source="facebook"
+                    source="meta"
                 )
                 db.add(msg)
                 await db.commit()
@@ -144,7 +144,7 @@ async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
                     context={
                         "contact_id": str(contact.id),
                         "conversation_id": str(conversation.id),
-                        "source": "facebook"
+                        "source": "meta"
                     }
                 )
                 
@@ -155,8 +155,8 @@ async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
                 if ai_reply:
                     logger.info(f"AI Generated Reply: {ai_reply}")
                     
-                    access_token = inbox.channel_config.get("accessToken", os.getenv("FACEBOOK_ACCESS_TOKEN", ""))
-                    client = FacebookClient(access_token, page_id=page_id)
+                    access_token = inbox.channel_config.get("accessToken", os.getenv("META_ACCESS_TOKEN", ""))
+                    client = MetaClient(access_token, page_id=page_id)
                     success = await client.send_text_message(sender_psid, ai_reply)
                     
                     if success:
@@ -186,5 +186,5 @@ async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
         return Response(content="EVENT_RECEIVED", status_code=200)
 
     except Exception as e:
-        logger.error(f"Error processing Facebook webhook: {e}")
+        logger.error(f"Error processing Meta webhook: {e}")
         return Response(status_code=500)

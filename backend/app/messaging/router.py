@@ -43,14 +43,14 @@ from app.messaging.schemas import (
 from app.messaging.service import MessagingService
 from app.messaging.websocket import manager
 from app.messaging.webhooks.whatsapp import router as whatsapp_router
-from app.messaging.webhooks.facebook import router as facebook_webhook_router
+from app.messaging.webhooks.meta import router as meta_webhook_router
 from app.messaging.channels.sms_twilio import TwilioSMSDriver
 from app.messaging.channels.voice_twilio import TwilioVoiceDriver
 from app.messaging.channels.email_smtp import SMTPEmailDriver
 
 router = APIRouter(prefix="/messaging", tags=["messaging"])
 router.include_router(whatsapp_router, prefix="/webhooks")
-router.include_router(facebook_webhook_router, prefix="/webhooks")
+router.include_router(meta_webhook_router, prefix="/webhooks")
 
 def get_messaging_service(db: AsyncSession = Depends(get_db)) -> MessagingService:
     return MessagingService(db)
@@ -175,17 +175,17 @@ async def create_message(
             result = await driver.send_email(to_email, "Re: Support", html_body=data.content)
             data.channel_metadata = result
             
-    elif inbox.channel_type == "facebook":
+    elif inbox.channel_type == "meta":
         import os
-        from app.messaging.channels.facebook_client import FacebookClient
+        from app.messaging.channels.meta_client import MetaClient
         
         # In a real setup, channel_config would contain the token for this specific inbox/page
-        page_access_token = inbox.channel_config.get("accessToken", os.getenv("FACEBOOK_ACCESS_TOKEN", ""))
+        page_access_token = inbox.channel_config.get("accessToken", os.getenv("META_ACCESS_TOKEN", ""))
         
-        client = FacebookClient(page_access_token)
+        client = MetaClient(page_access_token)
         
-        # Get the PSID (Page-Scoped ID) of the user from the conversation metadata
-        recipient_psid = conv.channel_metadata.get("sender_psid")
+        # Get the PSID (Page-Scoped ID) or IGSID of the user from the conversation metadata
+        recipient_psid = conv.channel_metadata.get("meta_psid")
         if recipient_psid:
             result = await client.send_text_message(recipient_psid, data.content)
             data.channel_metadata = result
