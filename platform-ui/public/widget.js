@@ -4,7 +4,7 @@
 
   const config = window.OmniBotConfig || {};
   const tenantId = config.tenantId;
-  const apiUrl = config.apiUrl || "http://10.0.0.41:8000/api/v1"; // Hardcoded for demo/local testing
+  const apiUrl = config.apiUrl || "http://10.0.0.41:8001/api/v1"; // Hardcoded for demo/local testing
 
   if (!tenantId) {
     console.error("OmniBot: Missing tenantId in window.OmniBotConfig");
