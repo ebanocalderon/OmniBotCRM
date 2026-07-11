@@ -1,1 +1,0 @@
-"""Chatwoot Anti-Corruption Layer."""

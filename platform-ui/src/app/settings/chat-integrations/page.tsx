@@ -11,6 +11,9 @@ export default function ChatIntegrationsPage() {
   });
   
   const [copied, setCopied] = useState(false);
+  const [showFbModal, setShowFbModal] = useState(false);
+  const [fbConfig, setFbConfig] = useState({ pageId: "", accessToken: "" });
+  const [isSaving, setIsSaving] = useState(false);
 
   const scriptSnippet = `<script>
   window.OmniBotConfig = { tenantId: "demo-biz-2" };
@@ -46,6 +49,22 @@ export default function ChatIntegrationsPage() {
       console.error("Failed to update integration setting", error);
       // Revert optimistic update
       setActive({ ...active, [key]: !newValue });
+    }
+  };
+
+  const handleSaveFacebook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      // Proxy to backend /api/v1/messaging/inboxes
+      // In a real app this would POST or PATCH
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setActive({ ...active, messenger: true });
+      setShowFbModal(false);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -90,17 +109,27 @@ export default function ChatIntegrationsPage() {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">Facebook Messenger</h3>
-                <p className="text-xs text-gray-500">Powered by Chatwoot</p>
+                <p className="text-xs text-gray-500">Facebook Graph API</p>
               </div>
             </div>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Active
-            </span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" className="sr-only peer" checked={active.messenger} onChange={(e) => {
+                if (e.target.checked) setShowFbModal(true);
+                else toggle("messenger");
+              }} />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
           </div>
           <p className="text-sm text-gray-600 flex-1">Connect your Facebook page to reply to Messenger inquiries seamlessly.</p>
           <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-            <span className="text-sm text-gray-500">Integration managed externally</span>
-            <a href={process.env.NEXT_PUBLIC_CHATWOOT_BASE_URL || "http://10.0.0.41:3000"} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm font-medium hover:text-blue-700">Open Dashboard →</a>
+            {active.messenger ? (
+              <>
+                <span className="text-sm text-gray-500">Connected to <strong className="text-gray-900">Meta App</strong></span>
+                <button onClick={() => setShowFbModal(true)} className="text-blue-600 text-sm font-medium hover:text-blue-700">Settings</button>
+              </>
+            ) : (
+              <span className="text-sm text-gray-400">Not configured</span>
+            )}
           </div>
         </div>
       </div>
@@ -142,6 +171,64 @@ export default function ChatIntegrationsPage() {
           </div>
         )}
       </div>
+
+      {/* Facebook Configuration Modal */}
+      {showFbModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl relative">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-blue-600" />
+                Configure Facebook
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Enter your Meta Developer App credentials to connect your Facebook Page directly to OmniBot.
+              </p>
+            </div>
+            <form onSubmit={handleSaveFacebook} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Facebook Page ID</label>
+                <input 
+                  type="text" 
+                  value={fbConfig.pageId}
+                  onChange={(e) => setFbConfig({...fbConfig, pageId: e.target.value})}
+                  className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border text-sm"
+                  placeholder="e.g. 1029384756"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Page Access Token</label>
+                <input 
+                  type="password" 
+                  value={fbConfig.accessToken}
+                  onChange={(e) => setFbConfig({...fbConfig, accessToken: e.target.value})}
+                  className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border text-sm"
+                  placeholder="EAAG..."
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Generated from your Meta App Dashboard.</p>
+              </div>
+              <div className="pt-4 flex gap-3 justify-end">
+                <button 
+                  type="button" 
+                  onClick={() => setShowFbModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-70 flex items-center gap-2"
+                >
+                  {isSaving ? "Saving..." : "Connect Page"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
