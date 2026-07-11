@@ -8,6 +8,7 @@ export default function ChatIntegrationsPage() {
     whatsapp: false,
     messenger: true,
     webchat: true
+  });
   const [copied, setCopied] = useState(false);
   const [showMetaModal, setShowMetaModal] = useState(false);
   const [metaConfig, setMetaConfig] = useState({ pageId: "", accessToken: "" });
